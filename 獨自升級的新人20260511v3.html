@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>易遊網獨自升級的新人 v3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            --ez-green: #11D073;
+            --ez-yellow: #EFE869;
+        }
+        body { background-color: #f8faf9; font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; }
+        .ez-card { background: white; border-radius: 16px; box-shadow: 0 8px 24px rgba(17, 208, 115, 0.08); padding: 24px; margin-bottom: 20px; border: 1px solid #eee; }
+        .ez-yellow-tag { background-color: var(--ez-yellow); color: #444; padding: 2px 12px; border-radius: 20px; font-weight: bold; }
+        .progress-ring__circle { transition: stroke-dashoffset 0.4s ease-in-out; transform: rotate(-90deg); transform-origin: 50% 50%; }
+        
+        /* 閃爍按鈕特效 */
+        @keyframes pulse-yellow {
+            0% { box-shadow: 0 0 0 0 rgba(239, 232, 105, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(239, 232, 105, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 232, 105, 0); }
+        }
+        .animate-pulse-yellow { animation: pulse-yellow 2s infinite; }
+    </style>
+</head>
+<body class="p-4 md:p-10">
+
+    <div class="max-w-md mx-auto">
+        <!-- 個人設定區 -->
+        <div class="ez-card border-t-8 border-[#EFE869]">
+            <h2 class="text-xl font-bold mb-4 flex items-center justify-between">
+                <span>個人設定</span>
+                <span class="text-xs ez-yellow-tag">ezTraveler</span>
+            </h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-xs text-gray-400 font-bold ml-1">員工編號</label>
+                    <input type="text" id="empId" placeholder="例: EZ12345" class="w-full border-b-2 border-gray-100 p-2 focus:border-[#11D073] outline-none transition-all">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400 font-bold ml-1">姓名</label>
+                    <input type="text" id="empName" placeholder="請輸入姓名" class="w-full border-b-2 border-gray-100 p-2 focus:border-[#11D073] outline-none transition-all">
+                </div>
+            </div>
+            <div id="welcomeMsg" class="mt-6 font-black text-center text-lg text-[#11D073] min-h-[1.5rem]"></div>
+        </div>
+
+        <!-- 進度值儀表板 -->
+        <div class="ez-card text-center relative overflow-hidden">
+            <h2 class="text-lg font-bold mb-6 text-gray-700 tracking-widest">任務達成率</h2>
+            <div class="relative inline-flex items-center justify-center">
+                <svg class="w-52 h-52">
+                    <circle class="text-gray-100" stroke-width="14" stroke="currentColor" fill="transparent" r="85" cx="104" cy="104" />
+                    <circle id="progressCircle" class="progress-ring__circle" stroke-width="14" stroke-dasharray="534" stroke-dashoffset="534" stroke-linecap="round" stroke="#11D073" fill="transparent" r="85" cx="104" cy="104" />
+                </svg>
+                <div class="absolute flex flex-col items-center">
+                    <span id="progressPercent" class="text-5xl font-black italic text-gray-800">0%</span>
+                    <span id="lvTag" class="ez-yellow-tag text-xs mt-1">LEVEL 0</span>
+                </div>
+            </div>
+            <p id="motivationalSpeech" class="mt-6 text-lg font-bold text-gray-500 min-h-[2rem]">準備起飛</p>
+            
+            <!-- 重複發送按鈕：預設隱藏 -->
+            <button id="resendBtn" onclick="sendGmail()" class="hidden mt-6 w-full py-4 bg-[#EFE869] text-gray-800 font-black rounded-xl shadow-lg hover:bg-[#e5de50] transition-all animate-pulse-yellow uppercase tracking-widest">
+                🚀 發送任務完成報告 (可重複)
+            </button>
+        </div>
+
+        <!-- 任務清單 -->
+        <div class="ez-card">
+            <h2 class="text-xl font-bold mb-6 border-l-4 border-[#11D073] pl-3">升級必經之路</h2>
+            <div id="taskList" class="space-y-3"></div>
+        </div>
+    </div>
+
+    <script>
+        const tasks = [
+            "領取門禁卡", "加入易遊網企業會員", "追蹤易遊網IG", 
+            "修改電腦登入密碼", "加入Ubereat企業會員", 
+            "完成補交報到資料", "完成新人必修課程"
+        ];
+
+        let state = {
+            empId: '',
+            empName: '',
+            completedTasks: []
+        };
+
+        function init() {
+            loadData();
+            renderTasks();
+            updateUI();
+            
+            document.getElementById('empId').addEventListener('input', (e) => { state.empId = e.target.value; saveData(); updateUI(); });
+            document.getElementById('empName').addEventListener('input', (e) => { state.empName = e.target.value; saveData(); updateUI(); });
+        }
+
+        function renderTasks() {
+            const container = document.getElementById('taskList');
+            container.innerHTML = tasks.map((task, index) => {
+                const isChecked = state.completedTasks.includes(index);
+                return `
+                <label class="flex items-center p-4 rounded-xl border-2 cursor-pointer transition-all ${isChecked ? 'border-[#11D073] bg-green-50' : 'border-gray-50 bg-gray-50'}">
+                    <input type="checkbox" class="hidden" onchange="toggleTask(${index})" ${isChecked ? 'checked' : ''}>
+                    <div class="w-6 h-6 border-2 rounded flex items-center justify-center ${isChecked ? 'bg-[#11D073] border-[#11D073]' : 'bg-white border-gray-300'}">
+                        ${isChecked ? '<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>' : ''}
+                    </div>
+                    <span class="ml-4 font-bold ${isChecked ? 'text-gray-800 line-through opacity-50' : 'text-gray-700'}">${task}</span>
+                </label>
+            `}).join('');
+        }
+
+        function toggleTask(index) {
+            const pos = state.completedTasks.indexOf(index);
+            if (pos === -1) state.completedTasks.push(index);
+            else state.completedTasks.splice(pos, 1);
+            
+            saveData();
+            renderTasks();
+            updateUI();
+            
+            if (state.completedTasks.length === tasks.length) {
+                triggerCelebration();
+                // 第一次達到 100% 時自動跳出提醒
+                setTimeout(() => { if(confirm("太棒了！已達成 100%！是否現在發送報告？")) sendGmail(); }, 500);
+            }
+        }
+
+        function updateUI() {
+            document.getElementById('empId').value = state.empId;
+            document.getElementById('empName').value = state.empName;
+            document.getElementById('welcomeMsg').textContent = state.empName ? `〔${state.empName}〕歡迎您加入易遊網` : "";
+
+            const percent = Math.round((state.completedTasks.length / tasks.length) * 100);
+            document.getElementById('progressPercent').textContent = `${percent}%`;
+            document.getElementById('lvTag').textContent = `LV. ${state.completedTasks.length}`;
+            
+            const circle = document.getElementById('progressCircle');
+            const circumference = 85 * 2 * Math.PI;
+            circle.style.strokeDashoffset = circumference - (percent / 100 * circumference);
+
+            const speech = document.getElementById('motivationalSpeech');
+            const resendBtn = document.getElementById('resendBtn');
+
+            if (percent === 100) {
+                speech.textContent = `〔${state.empName || '夥伴'}〕，恭喜您已經成為易遊網的一份子！`;
+                speech.className = "mt-6 text-lg font-bold text-[#11D073]";
+                resendBtn.classList.remove('hidden'); // 顯示重複發送按鈕
+            } else {
+                resendBtn.classList.add('hidden');
+                speech.className = "mt-6 text-lg font-bold text-gray-500";
+                if (percent === 0 || percent < 30) speech.textContent = "準備起飛";
+                else if (percent < 50) speech.textContent = "漸入佳境";
+                else if (percent < 80) speech.textContent = "持之以恆";
+                else speech.textContent = "功成在即";
+            }
+        }
+
+        function triggerCelebration() {
+            const duration = 2 * 1000;
+            const end = Date.now() + duration;
+            (function frame() {
+                confetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#11D073', '#EFE869'] });
+                confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#11D073', '#EFE869'] });
+                if (Date.now() < end) requestAnimationFrame(frame);
+            }());
+        }
+
+        function sendGmail() {
+            const recipient = "eztraining@eztravel.com.tw";
+            const subject = `〔${state.empId || '未填'}〕＿〔${state.empName || '未填'}〕已完成新人任務`;
+            const body = `員工姓名：${state.empName || '未填'}%0D%0A員工編號：${state.empId || '未填'}%0D%0A%0D%0A這是一位優秀新人的自動回報：該員已成功完成所有新人升級任務。`;
+            
+            // Gmail Web Compose 介面
+            const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${recipient}&su=${subject}&body=${body}`;
+            window.open(gmailUrl, '_blank');
+        }
+
+        function saveData() { localStorage.setItem('ezSoloLevelingData_v3', JSON.stringify(state)); }
+        function loadData() {
+            const saved = localStorage.getItem('ezSoloLevelingData_v3');
+            if (saved) state = JSON.parse(saved);
+        }
+
+        init();
+    </script>
+</body>
+</html>
